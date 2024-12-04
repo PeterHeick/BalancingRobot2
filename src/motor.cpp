@@ -66,18 +66,19 @@ void Motor::setPWM(int pwm)
     diffArray[prevPwm] = (int)LOWPASSFILTER(diff, diffArray[prevPwm], ALPHA);
 
     _targetRpm = (int)map(pwm, 0, _pwmMax, _rpmMin, _rpmMax);
-    Serial.printf(">> TargetRpm: %d = pwm: %d, _pwmMax: %d, _rpmMin: %d, _rpmMax: %d\n", _targetRpm, pwm, _pwmMax, _rpmMin, _rpmMax);
+    Serial.printf(">> new TargetRpm: %d\n", _targetRpm);
 
     _adjustedPwm = adjustPWM(pwm, pwm >= prevPwm);
-    ledcWrite(_pwmKanal, _adjustedPwm + diffArray[pwm]);
+    ledcWrite(_pwmKanal, _adjustedPwm);
+    // ledcWrite(_pwmKanal, _adjustedPwm + diffArray[pwm]);
     resetPulseCount();
     prevPwm = pwm;
 
-    if (prt++ % 100 == 0)
+    if (prt++ % 500 == 0)
     {
         for (int i = 0; i <= 255; i++)
         {
-            Serial.printf("%d, %d\n", i, diffArray[i]);
+            Serial.printf("## %d, %d\n", i, diffArray[i]);
         }
         Serial.printf("\n");
     }

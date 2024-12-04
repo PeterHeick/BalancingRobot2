@@ -8,6 +8,11 @@
 Motor motor(IN1, IN2, ENA, HALL_PIN1, HALL_PIN2);
 BNO085 bno085;
 euler_t ypr;
+float Yaw = 0;
+
+double Setpoint, Input, Output;
+double Kp = 2, Ki = 5, Kd = 1;
+PID myPID(&Input, &Output, &Setpoint, Kp, Ki, Kd, DIRECT);
 
 void IRAM_ATTR hallAISR()
 {
@@ -25,14 +30,28 @@ void setup()
 
   // Initialiser motor
   motor.begin();
+
+  // Try to initialize!
+  if (!bno085.begin())
+  {
+    Serial.println("Failed to find BNO08x chip");
+  }
+  Serial.println("BNO08x Found!");
+
   delay(1000);
+  if (bno085.readSensor(ypr))
+  {
+    Yaw = ypr.yaw;
+  }
 
   // Setup interrupts
   attachInterrupt(digitalPinToInterrupt(HALL_PIN1), hallAISR, RISING);
   attachInterrupt(digitalPinToInterrupt(HALL_PIN2), hallBISR, RISING);
 
+  myPID.SetMode(AUTOMATIC);
+
   // Print CSV header
-  Serial.printf("PWM,AdjustedPWM,TargetRPM,ActualRPM\n");
+  Serial.printf("PWM,AdjustedPWM,TargetRPM,ActualRPM, PID, Pitch, Direction\n");
 }
 
 void loop()
@@ -40,10 +59,6 @@ void loop()
   static int direction = 1;
   static int pwm = 0;
   static unsigned long last = 0;
-  static float prevDt = 0.0;
-  static float dt;
-  static float filteredDt;
-  double Setpoint, Input, Output;
 
   unsigned long now = millis();
 
@@ -51,14 +66,15 @@ void loop()
   {
     ypr.pitch += INITBALANCE;
 
-    now = micros();
-    dt = (now - last) / 1000000.0;
-    last = now;
-    filteredDt = LOWPASSFILTER(dt, prevDt, ALPHA);
-    prevDt = filteredDt;
+    Setpoint = 0.0;
+    Input = ypr.pitch;
+    myPID.Compute();
+    direction = Output >= 0 ? 1 : -1;
+    pwm = (int)std::abs(Output);
+    Serial.printf(">> Pid: %.2f, pwm: %d\n", Output, pwm);
   }
 
-  if (now - last > 300)
+  if (now - last > 100)
   {
     // Få aktuel RPM
     int actualRpm = motor.getActualRpm();
@@ -66,21 +82,14 @@ void loop()
     int targetRpm = motor.getTargetRpm();
 
     // Print debug-data
-    if (actualRpm > 0)
-    {
-      Serial.printf("%d,%d,%d,%ld\n",
-                    pwm,
-                    adjustedPWM,
-                    targetRpm,
-                    actualRpm);
-    }
-
-    // Opdater PWM (sweep op og ned)
-    pwm += direction;
-    if (pwm >= 255 || pwm <= 0)
-    {
-      direction = -direction;
-    }
+    Serial.printf("%d,%d,%d,%d,%.2f, %.2f, %d\n",
+                  pwm,
+                  adjustedPWM,
+                  targetRpm,
+                  actualRpm,
+                  Output,
+                  ypr.pitch,
+                  direction);
 
     motor.setPWM(pwm);
     last = now;
