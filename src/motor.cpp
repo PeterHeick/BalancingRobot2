@@ -26,27 +26,27 @@ Motor::Motor(int pinIN1, int pinIN2, int pinENA, int hallPin1, int hallPin2,
 
 void Motor::begin()
 {
-    // Motor pin setup
-    pinMode(_pinIN1, OUTPUT);
-    pinMode(_pinIN2, OUTPUT);
-    ledcSetup(_pwmKanal, _pwmFrekvens, _pwmResolution);
-    ledcAttachPin(_pinENA, _pwmKanal);
+  // Motor pin setup
+  pinMode(_pinIN1, OUTPUT);
+  pinMode(_pinIN2, OUTPUT);
+  ledcSetup(_pwmKanal, _pwmFrekvens, _pwmResolution);
+  ledcAttachPin(_pinENA, _pwmKanal);
 
-    // Hall sensor setup
-    pinMode(_hallPin1, INPUT_PULLUP);
-    pinMode(_hallPin2, INPUT_PULLUP);
+  // Hall sensor setup
+  pinMode(_hallPin1, INPUT_PULLUP);
+  pinMode(_hallPin2, INPUT_PULLUP);
 
-    // Start motoren fremad
-    setDirection(true);
-    setPWM(0);
+  // Start motoren fremad
+  setDirection(true);
+  setPWM(0);
 
-    _startMeasurementTime = millis();
+  _startMeasurementTime = millis();
 }
 
 void Motor::setDirection(bool forward)
 {
-    digitalWrite(_pinIN1, forward ? HIGH : LOW);
-    digitalWrite(_pinIN2, forward ? LOW : HIGH);
+  digitalWrite(_pinIN1, forward ? HIGH : LOW);
+  digitalWrite(_pinIN2, forward ? LOW : HIGH);
 }
 
 //   pwm     adjustedPwm    targetRpm
@@ -54,91 +54,97 @@ void Motor::setDirection(bool forward)
 //
 void Motor::setPWM(int pwm)
 {
-    int diff;
-    static int prevPwm = 0;
-    static int diffArray[256] = {0};
-    static int prt = 0;
+  int diff;
+  static int prevPwm = 0;
+  static int diffArray[256] = {0};
+  static int prt = 0;
 
-    int actual = getActualRpm();
-    diff = _targetRpm - actual;
-    Serial.printf(">> TargetRpm: %d, Actual: %d, diff: %d\n", _targetRpm, actual, diff);
-    // diffArray[prevPwm] = diff;
-    diffArray[prevPwm] = (int)LOWPASSFILTER(diff, diffArray[prevPwm], ALPHA);
+  int actual = getActualRpm();
+  diff = _targetRpm - actual;
+#ifdef TEST
+  Serial.printf(">> TargetRpm: %d, Actual: %d, diff: %d\n", _targetRpm, actual, diff);
+#endif
+  // diffArray[prevPwm] = diff;
+  diffArray[prevPwm] = (int)LOWPASSFILTER(diff, diffArray[prevPwm], ALPHA);
 
-    _targetRpm = (int)map(pwm, 0, _pwmMax, _rpmMin, _rpmMax);
-    Serial.printf(">> new TargetRpm: %d\n", _targetRpm);
+  _targetRpm = (int)map(pwm, 0, _pwmMax, _rpmMin, _rpmMax);
+#ifdef TEST
+  Serial.printf(">> new TargetRpm: %d\n", _targetRpm);
+#endif
 
-    _adjustedPwm = adjustPWM(pwm, pwm >= prevPwm);
-    ledcWrite(_pwmKanal, _adjustedPwm);
-    // ledcWrite(_pwmKanal, _adjustedPwm + diffArray[pwm]);
-    resetPulseCount();
-    prevPwm = pwm;
+  _adjustedPwm = adjustPWM(pwm, pwm >= prevPwm);
+  ledcWrite(_pwmKanal, _adjustedPwm);
+  // ledcWrite(_pwmKanal, _adjustedPwm + diffArray[pwm]);
+  resetPulseCount();
+  prevPwm = pwm;
 
-    if (prt++ % 500 == 0)
+#ifdef TEST
+  if (prt++ % 500 == 0)
+  {
+    for (int i = 0; i <= 255; i++)
     {
-        for (int i = 0; i <= 255; i++)
-        {
-            Serial.printf("## %d, %d\n", i, diffArray[i]);
-        }
-        Serial.printf("\n");
+      Serial.printf("## %d, %d\n", i, diffArray[i]);
     }
+    Serial.printf("\n");
+  }
+#endif
 }
 
 int Motor::getActualRpm()
 {
-    updateRPM();
-    return _actualRpm;
+  updateRPM();
+  return _actualRpm;
 }
 
 int Motor::getAdjustedPwm() const
 {
-    return _adjustedPwm;
+  return _adjustedPwm;
 }
 
 int Motor::getTargetRpm() const
 {
-    return _targetRpm;
+  return _targetRpm;
 }
 
 void Motor::incrementPulseCount()
 {
-    _pulseCount++;
+  _pulseCount++;
 }
 
 void Motor::resetPulseCount()
 {
-    _pulseCount = 0;
-    _startMeasurementTime = millis();
+  _pulseCount = 0;
+  _startMeasurementTime = millis();
 }
 
 int Motor::adjustPWM(int pwmA, bool isAccelerating)
 {
-    int pwmB = 0;
+  int pwmB = 0;
 
-    if (pwmA == 0)
-    {
-        return 0;
-    }
-    if (isAccelerating)
-    {
-        pwmB = map(pwmA, 1, 255, 30, 255);
-    }
-    else
-    {
-        pwmB = map(pwmA, 1, 255, 25, 255);
-    }
+  if (pwmA == 0)
+  {
+    return 0;
+  }
+  if (isAccelerating)
+  {
+    pwmB = map(pwmA, 1, 255, 30, 255);
+  }
+  else
+  {
+    pwmB = map(pwmA, 1, 255, 25, 255);
+  }
 
-    return pwmB;
+  return pwmB;
 }
 
 void Motor::updateRPM()
 {
-    unsigned long timepassed = millis() - _startMeasurementTime;
+  unsigned long timepassed = millis() - _startMeasurementTime;
 
-    if (timepassed > _minMeasurementTime)
-    {
-        float pulsesPerSecond = (float)_pulseCount * (1000.0 / timepassed);
-        float motorRPM = (pulsesPerSecond * 60.0) / _countsPerMotorRev;
-        _actualRpm = (int)(motorRPM / _gearRatio);
-    }
+  if (timepassed > _minMeasurementTime)
+  {
+    float pulsesPerSecond = (float)_pulseCount * (1000.0 / timepassed);
+    float motorRPM = (pulsesPerSecond * 60.0) / _countsPerMotorRev;
+    _actualRpm = (int)(motorRPM / _gearRatio);
+  }
 }

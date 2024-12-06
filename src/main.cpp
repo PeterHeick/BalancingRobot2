@@ -5,6 +5,8 @@
 #include "robot.h"
 #include "Motor.h"
 
+// #define TEST 1
+
 Motor motor(IN1, IN2, ENA, HALL_PIN1, HALL_PIN2);
 BNO085 bno085;
 euler_t ypr;
@@ -34,9 +36,11 @@ void setup()
   // Try to initialize!
   if (!bno085.begin())
   {
-    Serial.println("Failed to find BNO08x chip");
+    Serial.printf("Failed to find BNO08x chip\n");
   }
-  Serial.println("BNO08x Found!");
+#ifdef TEST
+  Serial.printf("BNO08x Found!\n");
+#endif
 
   delay(1000);
   if (bno085.readSensor(ypr))
@@ -71,7 +75,9 @@ void loop()
     myPID.Compute();
     direction = Output >= 0 ? 1 : -1;
     pwm = (int)std::abs(Output);
+#ifdef TEST
     Serial.printf(">> Pid: %.2f, pwm: %d\n", Output, pwm);
+#endif
   }
 
   if (now - last > 100)

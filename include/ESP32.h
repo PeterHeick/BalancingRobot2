@@ -3,8 +3,8 @@
 // Description: Defines for ESP32 pins.
 
 // Gyro: MPU6050
-#define SDA 21
-#define SCL 22
+#define SDA 21    // Blå
+#define SCL 22    // Gul
 
 // HC-SR04 ultralydssensor:
 // Trig på HC-SR04 til GPIO32 på ESP32 Output.
